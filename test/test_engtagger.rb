@@ -8,34 +8,34 @@ require 'test/unit' unless defined? $ZENTEST and $ZENTEST
 require 'engtagger'
 
 class TestEngTagger < Test::Unit::TestCase
-  
+
   @@untagged =<<EOD
-Lisa Raines, a lawyer and director of government relations for the Industrial Biotechnical Association, contends that a judge well-versed in patent law and the concerns of research-based industries would have ruled otherwise. And Judge Newman, a former patent lawyer, wrote in her dissent when the court denied a motion for a rehearing of the case by the full court, "The panel's judicial legislation has affected an important high-technological industry, without regard to the consequences for research and innovation or the public interest." Says Ms. Raines, "[The judgement] confirms our concern that the absence of patent lawyers on the court could prove troublesome."    
+Lisa Raines, a lawyer and director of government relations for the Industrial Biotechnical Association, contends that a judge well-versed in patent law and the concerns of research-based industries would have ruled otherwise. And Judge Newman, a former patent lawyer, wrote in her dissent when the court denied a motion for a rehearing of the case by the full court, "The panel's judicial legislation has affected an important high-technological industry, without regard to the consequences for research and innovation or the public interest." Says Ms. Raines, "[The judgement] confirms our concern that the absence of patent lawyers on the court could prove troublesome."
 EOD
 
   @@tagged =<<EOD
 <nnp>Lisa</nnp> <nnp>Raines</nnp> <ppc>,</ppc> <det>a</det> <nn>lawyer</nn> <cc>and</cc> <nn>director</nn> <in>of</in> <nn>government</nn> <nns>relations</nns> <in>for</in> <det>the</det> <nnp>Industrial</nnp> <nnp>Biotechnical</nnp> <nnp>Association</nnp> <ppc>,</ppc> <vbz>contends</vbz> <in>that</in> <det>a</det> <nn>judge</nn> <jj>well-versed</jj> <in>in</in> <nn>patent</nn> <nn>law</nn> <cc>and</cc> <det>the</det> <nns>concerns</nns> <in>of</in> <jj>research-based</jj> <nns>industries</nns> <md>would</md> <vb>have</vb> <vbn>ruled</vbn> <rb>otherwise</rb> <pp>.</pp>
 EOD
-  
+
   def setup
     @tagger = EngTagger.new
     tagpath = File.join($ENGTAGGER_LIB, @tagger.conf[:tag_path])
     wordpath = File.join($ENGTAGGER_LIB, @tagger.conf[:word_path])
-    if !File.exists?(tagpath) or !File.exists?(wordpath)
+    if !File.exist?(tagpath) or !File.exist?(wordpath)
       @tagger.install
     end
   end
-  
+
   def text_get_ext
     model = '<cd>[^<]+</cd}>\s*'
     assert_equal(model, EngTagger.get_ext(model, "cd"))
   end
-  
+
   def test_explain_tag
     assert_equal("noun", EngTagger.explain_tag("nn"))
-    assert_equal("verb_infinitive", EngTagger.explain_tag("vb"))  
+    assert_equal("verb_infinitive", EngTagger.explain_tag("vb"))
   end
-  
+
   def test_add_tags
     assert_instance_of(String, @tagger.add_tags(@@untagged))
   end
@@ -54,7 +54,7 @@ EOD
       assert(EngTagger.hmm.keys.index(result))
     end
   end
-     
+
   def test_classify_unknown_word
     assert_equal("*LRB*", @tagger.classify_unknown_word("{"))
     assert_equal("*NUM*", @tagger.classify_unknown_word("123.4567"))
@@ -92,13 +92,25 @@ EOD
     assert_instance_of(Regexp, @tagger.get_max_noun_regex)
   end
 
-  def test_get_noun_phrases    
+  def test_get_noun_phrases
     result = @tagger.get_noun_phrases(@@tagged)
     assert_instance_of(Hash, result)
   end
 
   def test_get_nouns
     result = @tagger.get_nouns(@@tagged)
+    assert_instance_of(Hash, result)
+  end
+
+  def test_get_singular_nouns
+    test = "<nnp>Make</nnp> <jj>sure</jj> <prps>your</prps> <nn>sample</nn> <vbz>is</vbz> <jj>perfect</jj> <cc>and</cc> <vbz>contains</vbz> <det>no</det> <nn>spelling</nn> <cc>or</cc> <jj>grammatical</jj> <nns>errors</nns> <pp>.</pp>"
+    result = @tagger.get_singular_nouns(test)
+    assert_instance_of(Hash, result)
+  end
+
+  def test_get_plural_nouns
+    test = "<nnp>Make</nnp> <jj>sure</jj> <prps>your</prps> <nn>sample</nn> <vbz>is</vbz> <jj>perfect</jj> <cc>and</cc> <vbz>contains</vbz> <det>no</det> <nn>spelling</nn> <cc>or</cc> <jj>grammatical</jj> <nns>errors</nns> <pp>.</pp>"
+    result = @tagger.get_plural_nouns(test)
     assert_instance_of(Hash, result)
   end
 
@@ -150,7 +162,7 @@ EOD
     models << ["test", "#", "test"]; texts <<  "test#test"
     models << ["I", "'d", "like"]; texts <<  "I'd like"
     models << ["is", "n't", "so"]; texts <<  "isn't so"
-    models << ["we", "'re", "all"]; texts <<  "we're all"  
+    models << ["we", "'re", "all"]; texts <<  "we're all"
 
     texts.each_with_index do |text, index|
       assert_equal(models[index], @tagger.split_punct(text))
@@ -162,7 +174,7 @@ EOD
     models << ["He", "is", "a", "u.s.", "army", "officer", "."]
     tests << ["He", "is", "a", "u.s.", "army", "officer."]
     models << ["He", "is", "Mr.", "Johnson", ".", "He", "'s", "my", "friend", "."]
-    tests << ["He", "is", "Mr.", "Johnson.", "He", "'s", "my", "friend."]    
+    tests << ["He", "is", "Mr.", "Johnson.", "He", "'s", "my", "friend."]
     models.length.times do |i|
       assert_equal(models[i], @tagger.split_sentences(tests[i]))
     end
@@ -174,7 +186,7 @@ EOD
     @tagger.conf[:stem] = true
     assert_equal("get", @tagger.stem(word))
     # the following should not work since we memoize stem method
-    # @tagger.conf[:stem] = false    
+    # @tagger.conf[:stem] = false
     # assert_equal("gets", @tagger.stem(word))
     @tagger.conf[:stem] = old
   end
@@ -191,7 +203,7 @@ EOD
     text = ""
     assert(!@tagger.valid_text(text))
   end
-  
+
   def test_override_default_params
     @tagger = EngTagger.new(:longest_noun_phrase => 3)
     assert_equal 3, @tagger.conf[:longest_noun_phrase]

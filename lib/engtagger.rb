@@ -59,8 +59,10 @@ class EngTagger
   NUM   = get_ext('cd')
   GER   = get_ext('vbg')
   ADJ   = get_ext('jj[rs]*')
-  NN    = get_ext('nn[sp]*')
+  NNALL = get_ext('nn[sp]*')
+  NN    = get_ext('nn')
   NNP   = get_ext('nnp')
+  NNS   = get_ext('nns')
   PREP  = get_ext('in')
   DET   = get_ext('det')
   PAREN = get_ext('[lr]rb')
@@ -192,7 +194,7 @@ class EngTagger
     # assuming that we start analyzing from the beginninga new sentence...
     @conf[:current_tag] = 'pp'
     @conf.merge!(params)
-    unless File.exists?(@conf[:word_path]) and File.exists?(@conf[:tag_path])
+    unless File.exist?(@conf[:word_path]) and File.exist?(@conf[:tag_path])
       print "Couldn't locate POS lexicon, creating a new one" if @conf[:debug]
       @@hmm = Hash.new
       @@lexicon = Hash.new
@@ -216,7 +218,6 @@ class EngTagger
     return nil unless valid_text(text)
     tagged = []
     words = clean_text(text)
-    tags = Array.new
     words.each do |word|
       cleaned_word = clean_word(word)
       tag = assign_tag(@conf[:current_tag], cleaned_word)
@@ -317,8 +318,38 @@ class EngTagger
   # occurrence frequencies.
   def get_nouns(tagged)
     return nil unless valid_text(tagged)
+    NNALL
+    trimmed = tagged.scan(NNALL).map do |n|
+      strip_tags(n)
+    end
+    ret = Hash.new(0)
+    trimmed.each do |n|
+      n = stem(n)
+      next unless n.length < 100  # sanity check on word length
+      ret[n] += 1 unless n =~ /\A\s*\z/
+    end
+    return ret
+  end
+
+  def get_singular_nouns(tagged)
+    return nil unless valid_text(tagged)
     NN
     trimmed = tagged.scan(NN).map do |n|
+      strip_tags(n)
+    end
+    ret = Hash.new(0)
+    trimmed.each do |n|
+      n = stem(n)
+      next unless n.length < 100  # sanity check on word length
+      ret[n] += 1 unless n =~ /\A\s*\z/
+    end
+    return ret
+  end
+
+  def get_plural_nouns(tagged)
+    return nil unless valid_text(tagged)
+    NNS
+    trimmed = tagged.scan(NNS).map do |n|
       strip_tags(n)
     end
     ret = Hash.new(0)
@@ -502,7 +533,7 @@ class EngTagger
       words.length.times do |i|
         found[words.join(' ')] += 1 if words.length > 1
         w = words.shift
-        found[w] += 1 if w =~ /#{NN}/
+        found[w] += 1 if w =~ /#{NNALL}/
       end
     end
     ret = Hash.new(0)
@@ -808,14 +839,14 @@ class EngTagger
       # optional number, gerund - adjective -participle
       (?:#{NUM})?(?:#{GER}|#{ADJ}|#{PART})*
         # Followed by one or more nouns
-        (?:#{NN})+
+        (?:#{NNALL})+
           (?:
             # Optional preposition, determinant, cardinal
             (?:#{PREP})*(?:#{DET})?(?:#{NUM})?
               # Optional gerund-adjective -participle
               (?:#{GER}|#{ADJ}|#{PART})*
                 # one or more nouns
-                (?:#{NN})+
+                (?:#{NNALL})+
            )*
     /xo #/
     return regex
@@ -832,7 +863,6 @@ class EngTagger
       /\A"?([^{"]+)"?: \{ (.*) \}/ =~ line
       next unless $1 and $2
       key, data = $1, $2
-      tags = Hash.new
       items = data.split(/,\s+/)
       pairs = {}
       items.each do |i|
@@ -855,7 +885,6 @@ class EngTagger
       /\A"?([^{"]+)"?: \{ (.*) \}/ =~ line
       next unless $1 and $2
       key, data = $1, $2
-      tags = Hash.new
       items = data.split(/,\s+/)
       pairs = {}
       items.each do |i|
